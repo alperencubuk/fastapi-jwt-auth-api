@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 from jose.exceptions import JWTClaimsError
 from sqlalchemy import select
@@ -41,7 +42,7 @@ async def authenticate_token(
     password_timestamp: float,
     db: AsyncSession,
 ) -> User | None:
-    user = await db.get(User, user_id)
+    user: User | None = await db.get(User, user_id)
     if user and password_timestamp == user.password_timestamp:
         return await validate_user(user=user)
     return None
@@ -88,13 +89,18 @@ async def authenticate_access_token(
 ) -> User | None:
     payload = await decode_token(token)
     if payload and payload.get("token_type") == TokenType.ACCESS:
-        user = await authenticate_token(
+        if user := await authenticate_token(
             user_id=payload["user_id"],
             password_timestamp=payload["password_timestamp"],
             db=db,
-        )
-        if user and (not roles or user.role in roles):
-            return user
+        ):
+            if not roles or user.role in roles:
+                return user
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access restricted. "
+                f"Only {roles} are allowed to access this endpoint.",
+            )
     return None
 
 
@@ -113,18 +119,6 @@ async def authenticate_refresh_token(token: str, db: AsyncSession) -> dict | Non
     return None
 
 
-async def authorization_header(request: Request) -> str | None:
-    if authorization := request.headers.get("Authorization"):
-        scheme, _, token = authorization.partition(" ")
-        if scheme and token and scheme.lower() == "bearer":
-            return token
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid Authorization Header",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-
 async def authenticate(token: str, db: AsyncSession, roles: list | None = None) -> User:
     if user := await authenticate_access_token(token=token, roles=roles, db=db):
         return user
@@ -136,12 +130,14 @@ async def authenticate(token: str, db: AsyncSession, roles: list | None = None) 
 
 
 async def auth(
-    token: str = Depends(authorization_header), db: AsyncSession = Depends(get_db)
+    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    return await authenticate(token=token, db=db)
+    return await authenticate(token=token.credentials, db=db)
 
 
 async def auth_admin(
-    token: str = Depends(authorization_header), db: AsyncSession = Depends(get_db)
+    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    return await authenticate(token=token, db=db, roles=[Roles.ADMIN])
+    return await authenticate(token=token.credentials, db=db, roles=[Roles.ADMIN.value])

@@ -19,7 +19,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, Any]:
         await db.close()
 
 
-async def database_health(db) -> bool:
+async def database_health(db: AsyncSession) -> bool:
     try:
         await db.execute(select(1))
         return True

@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     APP_TITLE: str = "FastAPI JWT Auth API"
     VERSION: str = "1.0.0"
 
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "123456"
+    ADMIN_EMAIL: str = "admin@admin.admin"
+
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     SECRET_KEY: str = "s3cr3t_k3y"

@@ -11,8 +11,8 @@ class UserRequest(BaseModel):
     username: str
     password: str
     email: EmailStr
-    first_name: str | None
-    last_name: str | None
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class UserCreate(UserRequest):

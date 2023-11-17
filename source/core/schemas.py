@@ -1,4 +1,7 @@
-from pydantic import BaseModel, Field
+from typing import Any
+
+from fastapi import HTTPException, status
+from pydantic import BaseModel, Field, ValidationError
 from pydantic.config import ConfigDict
 
 
@@ -17,7 +20,16 @@ class PageSchema(BaseModel):
 
 class PaginationSchema(BaseModel):
     page: int = Field(default=1, ge=1)
-    size: int = Field(default=50, ge=0)
+    size: int = Field(default=50, ge=1)
+
+    def __init__(self, **data: Any) -> None:
+        try:
+            super(PaginationSchema, self).__init__(**data)
+        except ValidationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=error.errors(),
+            )
 
 
 class ExceptionSchema(BaseModel):

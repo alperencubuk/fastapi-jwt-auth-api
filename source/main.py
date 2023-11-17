@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from source.app.users.utils import create_admin
 from source.core.database import database_health, get_db
 from source.core.routers import api_router
 from source.core.schemas import HealthSchema
@@ -12,6 +13,7 @@ from source.core.settings import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await create_admin()
     yield
 
 

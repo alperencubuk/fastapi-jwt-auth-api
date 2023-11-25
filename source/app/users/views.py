@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from source.app.auth.auth import Admin, CurrentUser
+from source.app.users.models import User
 from source.app.users.schemas import (
     UserPage,
     UserPagination,
@@ -25,9 +26,7 @@ users_router = APIRouter(prefix="/users")
     status_code=status.HTTP_201_CREATED,
     tags=["users"],
 )
-async def user_create(
-    user: UserRequest, db: AsyncSession = Depends(get_db)
-) -> UserResponse:
+async def user_create(user: UserRequest, db: AsyncSession = Depends(get_db)) -> User:
     if created_user := await create_user(user=user, db=db):
         return created_user
     raise HTTPException(
@@ -42,8 +41,8 @@ async def user_create(
     responses={status.HTTP_401_UNAUTHORIZED: {"model": ExceptionSchema}},
     tags=["users"],
 )
-async def user_get(user: CurrentUser) -> UserResponse:
-    return UserResponse.model_validate(user)
+async def user_get(user: CurrentUser) -> User:
+    return user
 
 
 @users_router.patch(
@@ -57,14 +56,14 @@ async def user_get(user: CurrentUser) -> UserResponse:
 )
 async def user_update(
     user: CurrentUser,
-    payload: UserUpdateRequest,
+    request: UserUpdateRequest,
     db: AsyncSession = Depends(get_db),
-) -> UserResponse:
-    if updated_user := await update_user(user=user, payload=payload, db=db):
+) -> User:
+    if updated_user := await update_user(user=user, request=request, db=db):
         return updated_user
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
-        detail=f"User '{payload.username}' already exists",
+        detail=f"User '{request.username}' already exists",
     )
 
 
@@ -86,7 +85,7 @@ async def user_delete(user: CurrentUser, db: AsyncSession = Depends(get_db)) -> 
     tags=["admin"],
 )
 async def users_list(
-    admin: Admin,
+    user: Admin,
     pagination: UserPagination = Depends(),
     db: AsyncSession = Depends(get_db),
 ) -> UserPage:

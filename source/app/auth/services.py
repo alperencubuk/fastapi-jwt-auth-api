@@ -27,11 +27,7 @@ async def validate_user(user: User) -> User:
 async def authenticate_user(
     username: str, password: str, db: AsyncSession
 ) -> User | None:
-    user = (
-        (await db.execute(select(User).filter_by(username=username)))
-        .scalars()
-        .one_or_none()
-    )
+    user = await db.scalar(select(User).filter_by(username=username))
     if user and verify_password(plain_password=password, hashed_password=user.password):
         return await validate_user(user=user)
     return None

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
 from jose.exceptions import JWTClaimsError
@@ -12,15 +12,13 @@ from source.app.auth.utils import verify_password
 from source.app.users.enums import Roles
 from source.app.users.models import User
 from source.core.database import get_db
+from source.core.exceptions import forbidden, unauthorized
 from source.core.settings import settings
 
 
 async def validate_user(user: User) -> User:
     if not user.active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Your account is blocked",
-        )
+        return unauthorized("Your account is blocked")
     return user
 
 
@@ -92,10 +90,8 @@ async def authenticate_access_token(
         ):
             if not roles or user.role in roles:
                 return user
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access restricted. "
-                f"Only {roles} are allowed to access this endpoint.",
+            return forbidden(
+                f"Access restricted. Only {roles} are allowed to access this endpoint."
             )
     return None
 
@@ -118,22 +114,22 @@ async def authenticate_refresh_token(token: str, db: AsyncSession) -> dict | Non
 async def authenticate(token: str, db: AsyncSession, roles: list | None = None) -> User:
     if user := await authenticate_access_token(token=token, roles=roles, db=db):
         return user
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    return unauthorized("Invalid or expired token")
 
 
 async def auth(
-    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    token: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False)),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    if not token:
+        return unauthorized("Invalid Authorization Header")
     return await authenticate(token=token.credentials, db=db)
 
 
 async def auth_admin(
-    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+    token: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False)),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    if not token:
+        return unauthorized("Invalid Authorization Header")
     return await authenticate(token=token.credentials, db=db, roles=[Roles.ADMIN.value])
